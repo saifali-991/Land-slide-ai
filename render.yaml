@@ -31,9 +31,10 @@ services:
       # Long random secret, generated once at blueprint creation.
       - key: NER_SECRET_KEY
         generateValue: true
-      # IMPORTANT: must equal your real frontend URL (add more, comma-separated).
+      # IMPORTANT: must equal your real frontend URL(s), comma-separated.
+      # -4qo9 = the actual URL Render assigned (clean name was taken by an older site).
       - key: NER_CORS_ORIGINS
-        value: https://ner-landslide-frontend.onrender.com
+        value: https://ner-landslide-frontend-4qo9.onrender.com,https://ner-landslide-frontend.onrender.com
 
   # ---------------- Frontend: React + Vite (Static Site) ----------------
   - type: web
