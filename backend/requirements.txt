@@ -1,0 +1,14 @@
+# NER Landslide AI — backend dependencies
+fastapi>=0.115
+uvicorn>=0.30
+pydantic>=2.7
+requests>=2.31
+SQLAlchemy>=2.0
+PyJWT>=2.8
+
+# ML runtime — backend loads ml/models/landslide_model.joblib for /api/risk/predict
+# (rule-based engine is the fallback if these are missing, but production deploys
+#  should include them so the trained model works)
+numpy>=1.26
+scikit-learn>=1.4
+joblib>=1.3

@@ -1,0 +1,56 @@
+# Render Blueprint — NER Landslide AI
+#
+# Deploys BOTH services in one go:
+#   1. ner-landslide-api       -> FastAPI backend  (Web Service, runtime: python)
+#   2. ner-landslide-frontend  -> React/Vite build (Static Site,  runtime: static)
+#
+# How to use: push this repo to GitHub, then on https://dashboard.render.com
+# choose "New +" -> "Blueprint", pick the repo, review, and "Apply".
+#
+# NOTE: if Render appends a random suffix to your service URLs (name taken),
+# update NER_CORS_ORIGINS (backend) and VITE_API_BASE_URL (frontend) in the
+# Render dashboard to the real URLs, then "Manual Deploy" the frontend once.
+
+services:
+  # ---------------- Backend: FastAPI (Web Service) ----------------
+  - type: web
+    name: ner-landslide-api
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    # $PORT is injected by Render. --proxy-headers makes the rate limiter see
+    # real client IPs (X-Forwarded-For) instead of Render's proxy IP.
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+    healthCheckPath: /
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: NER_ENV
+        value: production
+      # Long random secret, generated once at blueprint creation.
+      - key: NER_SECRET_KEY
+        generateValue: true
+      # IMPORTANT: must equal your real frontend URL (add more, comma-separated).
+      - key: NER_CORS_ORIGINS
+        value: https://ner-landslide-frontend.onrender.com
+
+  # ---------------- Frontend: React + Vite (Static Site) ----------------
+  - type: web
+    name: ner-landslide-frontend
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # IMPORTANT: set to your real backend URL. Vite bakes this in at build
+      # time; changing it triggers a rebuild automatically.
+      - key: VITE_API_BASE_URL
+        value: https://ner-landslide-api.onrender.com
+    routes:
+      # SPA fallback: index.html for client-side routes (/analyze, /login, ...)
+      - type: rewrite
+        source: /*
+        destination: /index.html

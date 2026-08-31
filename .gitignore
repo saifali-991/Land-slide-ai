@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Environment & secrets
+.env
+*.env
+!.env.example
+
+# Local databases
+database/*.db
+database/*.sqlite3
+
+# Logs & local tools
+*.log
+backend/server.log
+backend/server.err
+.tools/
+
+# OS
+.DS_Store
+Thumbs.db
