@@ -39,6 +39,29 @@ class WeatherServiceError(RuntimeError):
     """Raised when the upstream weather/elevation service cannot be reached."""
 
 
+_RETRY_STATUS = {429, 500, 502, 503, 504}
+
+
+def _get_upstream(url: str, params: dict, attempts: int = 3):
+    """GET with short retries. Open-Meteo occasionally rate-limits or briefly
+    fails shared datacenter egress IPs (e.g. Render free tier); a small backoff
+    turns those transient blips into successful responses instead of 503s."""
+    last_exc: Exception | None = None
+    for attempt in range(attempts):
+        try:
+            resp = requests.get(url, params=params, timeout=WEATHER_API_TIMEOUT)
+            if resp.status_code in _RETRY_STATUS and attempt < attempts - 1:
+                time.sleep(0.8 * (attempt + 1))
+                continue
+            resp.raise_for_status()
+            return resp
+        except requests.RequestException as exc:
+            last_exc = exc
+            if attempt < attempts - 1:
+                time.sleep(0.8 * (attempt + 1))
+    raise WeatherServiceError(f"Upstream unavailable after {attempts} attempts: {last_exc}")
+
+
 def _cache_get(key):
     hit = _cache.get(key)
     if hit and time.monotonic() - hit[0] < WEATHER_CACHE_TTL_SECONDS:
@@ -74,9 +97,10 @@ def fetch_current_weather(lat: float, lon: float) -> dict:
         "timezone": "auto",
     }
     try:
-        resp = requests.get(FORECAST_URL, params=params, timeout=WEATHER_API_TIMEOUT)
-        resp.raise_for_status()
+        resp = _get_upstream(FORECAST_URL, params)
         data = resp.json()
+    except WeatherServiceError:
+        raise
     except Exception as exc:
         raise WeatherServiceError(f"Weather service unavailable: {exc}") from exc
 
@@ -140,9 +164,10 @@ def fetch_elevation_and_slope(lat: float, lon: float) -> dict:
         "longitude": ",".join(f"{v:.6f}" for v in [lon, lon, lon, lon + d, lon - d]),
     }
     try:
-        resp = requests.get(ELEVATION_URL, params=params, timeout=WEATHER_API_TIMEOUT)
-        resp.raise_for_status()
+        resp = _get_upstream(ELEVATION_URL, params)
         center, north, south, east, west = (resp.json().get("elevation", []) + [None] * 5)[:5]
+    except WeatherServiceError:
+        raise
     except Exception as exc:
         raise WeatherServiceError(f"Elevation service unavailable: {exc}") from exc
 
